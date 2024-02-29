@@ -29,12 +29,26 @@ pipeline{
                 checkoutGit('https://github.com/alwaystilted/Youtube-clone-app-ajay.git', 'main')
             }
         }
+        stage('NPM Build'){
+            when { expression { params.action == 'create'}}    
+            steps{
+                npmInstall()
+            }
+        }
         stage('SonarQube Analysis'){
             when { expression { params.action == 'create'}}    
             steps{
                 sonarqubeAnalysis()
             }
         }
+        stage('Sleep') {
+            steps {
+            script {
+                print('I am sleeping for a while')
+                sleep(30)    
+                }
+            }
+         }
         stage('QualityGate Ananlysis'){
             when { expression { params.action == 'create'}}    
             steps{
@@ -44,24 +58,18 @@ pipeline{
                 }
             }
         }
-        stage('NPM Build'){
-            when { expression { params.action == 'create'}}    
-            steps{
-                npmInstall()
+        stage('OWASP FS SCAN') {
+            steps {
+                dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit', odcInstallation: 'DP-Check'
+                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
             }
         }
-        ///*stage('OWASP FS SCAN') {
-        //    steps {
-        //        dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit', odcInstallation: 'DP-Check'
-        //        dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
-        //    }
-        //}*/
-        //stage('TRIVY FS SCAN') {
-        //    when {expression { params.action == 'create'}}
-        //    steps {
-        //        sh "trivy fs . > trivyfs.txt"
-        //    }
-        //}
+        stage('TRIVY FS SCAN') {
+            when {expression { params.action == 'create'}}
+            steps {
+                sh "trivy fs . > trivyfs.txt"
+            }
+        }
         stage("Docker Build & Push"){
             when {expression { params.action == 'create'}}
             steps{
@@ -74,17 +82,17 @@ pipeline{
                 }
             }
         }
-        //stage("TRIVY"){
-        //    when {expression { params.action == 'create'}}
-        //    steps{
-        //        sh "trivy image alwaystilted/youtube:latest > trivyimage.txt" 
-        //    }
-        //}
-        ///*stage('Deploy to container'){
-        //    steps{
-        //        sh 'docker run -d --name youtube1 -p 3000:3000 alwaystilted/youtube:latest'
-        //    }
-        //}*/
+        stage("TRIVY"){
+            when {expression { params.action == 'create'}}
+            steps{
+                sh "trivy image alwaystilted/youtube:latest > trivyimage.txt" 
+            }
+        }
+        stage('Deploy to container'){
+            steps{
+                sh 'docker run -d --name youtube1 -p 3000:3000 alwaystilted/youtube:latest'
+            }
+        }
         stage('Container start'){
             when { expression { params.action == 'create'}}
             steps{

@@ -6,9 +6,9 @@ def COLOR_MAP = [
 pipeline{
     agent any
     parameters {
-        choice(name: 'action', choices: 'create\ndelete', description: 'Select create or destroy.')
+        choice(name: 'Action', choices: 'Create\nDelete', description: 'Select create or destroy.')
         string(name: 'DOCKER_HUB_USERNAME', defaultValue: 'alwaystilted', description: 'Docker Hub Username')
-        string(name: 'IMAGE_NAME', defaultValue: 'youtube', description: 'Docker Image Name')
+        string(name: 'IMAGE_NAME', defaultValue: 'Youtube', description: 'Docker Image Name')
     }
     tools{
         jdk 'jdk17'
@@ -24,7 +24,6 @@ pipeline{
             }
         }
         stage('Checkout SCM'){
-            when { expression { params.action == 'create'}}
             steps{
                 checkoutGit('https://github.com/alwaystilted/Youtube-clone-app-ajay.git', 'main')
             }
@@ -42,9 +41,10 @@ pipeline{
             }
         }
         stage('Sleep') {
+            when { expression { params.action == 'create'}}
             steps {
             script {
-                print('I am sleeping for a while')
+                print('Yo! I am sleeping for a bit')
                 sleep(30)    
                 }
             }
@@ -59,6 +59,7 @@ pipeline{
             }
         }
         stage('OWASP FS SCAN') {
+            when {expression { params.action == 'create'}}
             steps {
                 dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit', odcInstallation: 'DP-Check'
                 dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
@@ -86,11 +87,6 @@ pipeline{
             when {expression { params.action == 'create'}}
             steps{
                 sh "trivy image alwaystilted/youtube:latest > trivyimage.txt" 
-            }
-        }
-        stage('Deploy to container'){
-            steps{
-                sh 'docker run -d --name youtube1 -p 3000:3000 alwaystilted/youtube:latest'
             }
         }
         stage('Container start'){

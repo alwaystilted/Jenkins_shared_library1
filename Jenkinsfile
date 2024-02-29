@@ -1,9 +1,12 @@
+@Library('Jenkins_shared_library1') _
 def COLOR_MAP = [
     'FAILURE' : 'danger',
     'SUCCESS' : 'good'
 ]
 pipeline{
     agent any
+    parameters {
+        choice(name: 'action', choices: 'create\ndelete', description: 'Select create or destroy.')
     tools{
         jdk 'jdk17'
         nodejs 'node16'
@@ -11,88 +14,49 @@ pipeline{
     environment {
         SCANNER_HOME=tool 'sonar-scanner'
     }
-    stages {
+    stages{
         stage('clean workspace'){
             steps{
-                cleanWs()
+                cleanWorkspace()
             }
         }
-        stage('Checkout from Git'){
+        stage('checkout from Git'){
             steps{
-                git branch: 'main', url: 'https://github.com/Aj7Ay/Youtube-clone-app.git'
+                checkoutGit('https://github.com/alwaystilted/Jenkins_shared_library1.git', 'main')
             }
         }
-        stage("Sonarqube Analysis "){
+    }
+    stage('sonarqube Analysis'){
+        when { expression { params.action == 'create'}}    
             steps{
-                withSonarQubeEnv('sonar-server') {
-                    sh ''' $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=youtube \
-                    -Dsonar.projectKey=youtube '''
-                }
+                sonarqubeAnalysis()
             }
         }
-        stage("quality gate"){
-           steps {
-                script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'Sonar-token' 
-                }
-            } 
-        }
-        stage('Install Dependencies') {
-            steps {
-                sh "npm install"
-            }
-        }
-        stage('OWASP FS SCAN') {
-            steps {
-                dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit', odcInstallation: 'DP-Check'
-                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
-            }
-        }
-        stage('TRIVY FS SCAN') {
-            steps {
-                sh "trivy fs . > trivyfs.txt"
-            }
-        }
-        stage("Docker Build & Push"){
+        stage('sonarqube QualitGate'){
+        when { expression { params.action == 'create'}}    
             steps{
                 script{
-                   withDockerRegistry(credentialsId: 'docker', toolName: 'docker'){   
-                       sh "docker build --build-arg REACT_APP_RAPID_API_KEY=f0ead79813ms -t youtube ."
-                       sh "docker tag youtube sevenajay/youtube:latest "
-                       sh "docker push sevenajay/youtube:latest "
-                    }
+                    def credentialsId = 'Sonar-token'
+                    qualityGate(credentialsId)
                 }
             }
         }
-        stage("TRIVY"){
+        stage('Npm'){
+        when { expression { params.action == 'create'}}    
             steps{
-                sh "trivy image sevenajay/youtube:latest > trivyimage.txt" 
+                npmInstall()
             }
         }
-        stage('Deploy to container'){
-            steps{
-                sh 'docker run -d --name youtube1 -p 3000:3000 sevenajay/youtube:latest'
-            }
-        }
-        stage('Deploy to kubernets'){
-            steps{
-                script{
-                    withKubeConfig(caCertificate: '', clusterName: '', contextName: '', credentialsId: 'k8s', namespace: '', restrictKubeConfigAccess: false, serverUrl: '') {
-                        sh 'kubectl apply -f deployment.yml'
-                    }
-                }
-            }
-        }
+    }
 
-    }
     post {
-    always {
-        echo 'Slack Notifications'
-        slackSend (
-            channel: '#channel name',   #change your channel name
-            color: COLOR_MAP[currentBuild.currentResult],
-            message: "*${currentBuild.currentResult}:* Job ${env.JOB_NAME} \n build ${env.BUILD_NUMBER} \n More info at: ${env.BUILD_URL}"
-        )
+        always {
+             echo 'Slack Notifications'
+             slackSend (
+                 channel: '#jenkins', 
+                 color: COLOR_MAP[currentBuild.currentResult],
+                 message: "*${currentBuild.currentResult}:* Job ${env.JOB_NAME} \n build ${env.BUILD_NUMBER} \n More info at: ${env.BUILD_URL}"
+               )
+           }
     }
-}
 }

@@ -76,7 +76,7 @@ pipeline{
             steps{
                 script{
                    withDockerRegistry(credentialsId: 'docker', toolName: 'docker'){   
-                       sh "docker build --build-arg REACT_APP_RAPID_API_KEY=9a7402bf32msha2dccb44144c9f3p1f6d3cjsn24c73e8e7456 -t youtube ."
+                       sh "docker build --build-arg REACT_APP_RAPID_API_KEY=<> -t youtube ."
                        sh "docker tag youtube alwaystilted/youtube:latest "
                        sh "docker push alwaystilted/youtube:latest "
                     }
